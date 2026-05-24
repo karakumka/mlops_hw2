@@ -1,0 +1,175 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "darkcyan"
+          },
+          "custom": {
+            "fillOpacity": 0.7,
+            "lineWidth": 1
+          },
+          "mappings": []
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 20,
+      "options": {
+        "orientation": "auto",
+        "barRadius": 0,
+        "barWidth": 0.95,
+        "groupWidth": 1,
+        "showValue": "never",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "hidden"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(fraud_score_bucket{us_state=~\"$us_state\", merch=~\"$merch\"}[5m])) by (le)",
+          "format": "time_series",
+          "instant": true, 
+          "legendFormat": "{{le}}",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Плотность распределения скоров модели (по штатам и мерчендайзам)",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "postgres",
+        "name": "PostgreSQL"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "fillOpacity": 0.85,
+            "lineWidth": 1
+          },
+          "unit": "percentunit" 
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "id": 30,
+      "title": "Доля фрода по категориям (1000 последних транзакций)",
+      "type": "barchart",
+      "options": {
+        "orientation": "vertical",
+        "stacking": "none",
+        "showValue": "always"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "postgres",
+            "name": "PostgreSQL"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawSql": "WITH last_1000_global AS (SELECT cat_id, fraud_flag FROM scores ORDER BY created_at DESC LIMIT 1000) SELECT cat_id as \"Категория\", AVG(fraud_flag) as \"Доля фрода\" FROM last_1000_global GROUP BY cat_id ORDER BY \"Доля фрода\" DESC;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PBFA97CFB590B2093"
+        },
+        "definition": "label_values(transactions_total, us_state)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "us_state",
+        "options": [],
+        "query": {
+          "query": "label_values(transactions_total, us_state)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {
+          "type": "prometheus",
+          "uid": "PBFA97CFB590B2093"
+        },
+        "definition": "label_values(transactions_total, merch)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "merch",
+        "options": [],
+        "query": {
+          "query": "label_values(transactions_total, merch)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Fraud Detection - Group Stats",
+  "version": 1
+}
