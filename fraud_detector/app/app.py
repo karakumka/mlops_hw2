@@ -30,11 +30,11 @@ SCORING_TOPIC = os.getenv("KAFKA_SCORING_TOPIC", "scoring")
 
 # Определяем метрики
 PROCESSING_TIME = Summary('transaction_processing_seconds', 'Время обработки транзакции')
-TRANSACTION_COUNT = Counter('transactions_total', 'Общее количество обработанных транзакций', ['us_state', 'merch'])
+TRANSACTION_COUNT = Counter('transactions_total', 'Общее количество обработанных транзакций')
 
 # Создаем более детальную гистограмму для распределения скоров
 # Используем линейные бакеты с шагом 0.02 от 0 до 1 (50 бакетов)
-FRAUD_SCORE = Histogram('fraud_score', 'Распределение скоров мошенничества', ['us_state', 'merch'],
+FRAUD_SCORE = Histogram('fraud_score', 'Распределение скоров мошенничества',
                        buckets=[i/50.0 for i in range(51)])  # [0.0, 0.02, 0.04, ..., 0.98, 1.0]
 
 FRAUD_RATIO = Gauge('fraud_ratio', 'Соотношение мошеннических транзакций к общему числу')
@@ -70,15 +70,12 @@ class ProcessingService:
 
             # Извлекаем ID и данные
             transaction_id = data['transaction_id']
-            raw_data = data['data']
-            if isinstance(raw_data, str):
-                transaction_dict = json.loads(raw_data)
-            else:
-                transaction_dict = raw_data
+            transaction_dict = data['data']
             input_df = pd.DataFrame([transaction_dict])
             
             state = str(input_df["us_state"].iloc[0])
             merch = str(input_df["merch"].iloc[0])
+            cat_id = str(input_df["cat_id"].iloc[0])
 
             # Препроцессинг и предсказание
             processed_df = preprocess_transform(input_df, onehot_encoder, catboost_encoder, feature_columns)
@@ -86,8 +83,8 @@ class ProcessingService:
             score = float(y_proba[0])
 
             # Обновляем метрики
-            TRANSACTION_COUNT.labels(us_state=state, merch=merch).inc()
-            FRAUD_SCORE.labels(us_state=state, merch=merch).observe(score)
+            TRANSACTION_COUNT.inc()
+            FRAUD_SCORE.observe(y_proba[0])
             
             self.total_transactions += 1
             is_fraud = int(submission['fraud_flag'].iloc[0])
@@ -102,6 +99,7 @@ class ProcessingService:
                 'transaction_id': transaction_id,
                 'score': score,
                 'fraud_flag': is_fraud,
+                "cat_id": cat_id,
                 "us_state": state,
                 "merch": merch,
             }

@@ -17,11 +17,10 @@ KAFKA_CONFIG = {
     "topic": os.getenv("KAFKA_TOPIC", "transactions"),
 }
 
-
 def load_file(uploaded_file_):
     """Загрузка CSV файла в DataFrame."""
     try:
-        return pd.read_csv(uploaded_file_, sep=",")
+        return pd.read_csv(uploaded_file_)
     except Exception as e:
         st.error(f"Ошибка загрузки файла: {e!s}")
         return None
@@ -48,7 +47,7 @@ def send_to_kafka(df, topic, bootstrap_servers):
                 topic,
                 value={
                     "transaction_id": row['transaction_id'],
-                    "data": row.drop('transaction_id').to_json(),
+                    "data": row.drop('transaction_id').to_dict(),
                 },
             )
             progress_bar.progress((idx + 1) / total_rows)

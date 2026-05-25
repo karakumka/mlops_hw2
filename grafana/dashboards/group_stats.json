@@ -11,60 +11,56 @@
   "panels": [
     {
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "postgres",
+        "name": "PostgreSQL"
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "fixed",
-            "fixedColor": "darkcyan"
-          },
           "custom": {
-            "fillOpacity": 0.7,
-            "lineWidth": 1
+            "fillOpacity": 20,
+            "lineWidth": 1,
+            "axisLabel": "Score bucket",
+            "axisPlacement": "auto"
           },
-          "mappings": []
-        }
+          "unit": "percentunit"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 24
       },
-      "id": 20,
+      "id": 101,
       "options": {
-        "orientation": "auto",
-        "barRadius": 0,
-        "barWidth": 0.95,
-        "groupWidth": 1,
-        "showValue": "never",
-        "stacking": "none",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
         "tooltip": {
           "mode": "single",
           "sort": "none"
         },
-        "legend": {
-          "displayMode": "hidden"
-        }
+        "xTickLabelRotation": 45,
+        "xTickLabelSpacing": 0
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": {
-            "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "type": "postgres",
+            "name": "PostgreSQL"
           },
           "editorMode": "code",
-          "expr": "sum(increase(fraud_score_bucket{us_state=~\"$us_state\", merch=~\"$merch\"}[5m])) by (le)",
-          "format": "time_series",
-          "instant": true, 
-          "legendFormat": "{{le}}",
-          "range": false,
+          "format": "table",
+          "rawQuery": true,
+         "rawSql": "WITH filtered_scores AS (\n    SELECT score\n    FROM scores\n    WHERE score IS NOT NULL\n      AND us_state LIKE ANY(ARRAY[${us_state:singlequote}])\n      AND merch LIKE ANY(ARRAY[${merch:sqlstring}])\n), bins AS (\n    SELECT\n        width_bucket(score, 0, 1, 20) AS bin_id,\n        COUNT(*) AS cnt\n    FROM filtered_scores\n    GROUP BY width_bucket(score, 0, 1, 20)\n), total AS (\n    SELECT SUM(cnt) AS total_cnt\n    FROM bins\n)\nSELECT\n    CONCAT(\n        ROUND(((bin_id - 1) * 0.05)::numeric, 2),\n        '-',\n        ROUND((bin_id * 0.05)::numeric, 2)\n    ) AS score_bin,\n    cnt::float / NULLIF(total_cnt, 0) AS density\nFROM bins, total\nWHERE bin_id BETWEEN 1 AND 20\nORDER BY bin_id;",
           "refId": "A"
         }
       ],
-      "title": "Плотность распределения скоров модели (по штатам и мерчендайзам)",
+      "title": "Плотность распределения скоров",
       "type": "barchart"
     },
     {
@@ -74,30 +70,35 @@
       },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "custom": {
-            "fillOpacity": 0.85,
-            "lineWidth": 1
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "showPoints": "auto"
           },
-          "unit": "percentunit" 
-        }
+          "unit": "ops"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 8
+        "w": 12,
+        "x": 12,
+        "y": 24
       },
-      "id": 30,
-      "title": "Доля фрода по категориям (1000 последних транзакций)",
-      "type": "barchart",
+      "id": 102,
       "options": {
-        "orientation": "vertical",
-        "stacking": "none",
-        "showValue": "always"
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
           "datasource": {
@@ -105,12 +106,59 @@
             "name": "PostgreSQL"
           },
           "editorMode": "code",
-          "format": "table",
-          "rawSql": "WITH last_1000_global AS (SELECT cat_id, fraud_flag FROM scores ORDER BY created_at DESC LIMIT 1000) SELECT cat_id as \"Категория\", AVG(fraud_flag) as \"Доля фрода\" FROM last_1000_global GROUP BY cat_id ORDER BY \"Доля фрода\" DESC;",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n    $__timeGroupAlias(created_at, '5s'),\n    COUNT(*)::float / 5 AS tps\nFROM scores\nWHERE us_state LIKE ANY(ARRAY[${us_state:singlequote}])\n  AND merch LIKE ANY(ARRAY[${merch:sqlstring}])\nGROUP BY 1\nORDER BY 1;",
           "refId": "A"
         }
-      ]
-    }
+      ],
+      "title": "TPS обработки выбранных транзакций",
+      "type": "timeseries"
+    },
+
+    {
+    "datasource": {
+      "type": "postgres",
+      "name": "PostgreSQL"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "unit": "percentunit"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 24,
+      "x": 0,
+      "y": 32
+    },
+    "id": 103,
+    "options": {
+      "legend": {
+        "displayMode": "list",
+        "placement": "bottom",
+        "showLegend": true
+      },
+      "orientation": "auto",
+      "showValue": "always"
+    },
+    "targets": [
+      {
+        "datasource": {
+          "type": "postgres",
+          "name": "PostgreSQL"
+        },
+        "editorMode": "code",
+        "format": "table",
+        "rawQuery": true,
+        "rawSql": "WITH last_1000_global AS (\n    SELECT\n        cat_id,\n        fraud_flag\n    FROM scores\n    WHERE cat_id IS NOT NULL\n    ORDER BY created_at DESC\n    LIMIT 1000\n)\nSELECT\n    cat_id AS \"Категория\",\n    AVG(fraud_flag)::float AS \"Доля фрода\"\nFROM last_1000_global\nGROUP BY cat_id\nORDER BY \"Доля фрода\" DESC;",
+        "refId": "A"
+      }
+    ],
+    "title": "Доля фрода по категориям (1000 последних транзакций)",
+    "type": "barchart"
+  }
   ],
   "refresh": "5s",
   "schemaVersion": 38,
@@ -119,21 +167,23 @@
   "templating": {
     "list": [
       {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "%"
         },
-        "definition": "label_values(transactions_total, us_state)",
+        "datasource": {
+          "type": "postgres",
+          "name": "PostgreSQL"
+        },
+        "definition": "SELECT DISTINCT us_state FROM scores WHERE us_state IS NOT NULL ORDER BY us_state;",
         "hide": 0,
         "includeAll": true,
+        "label": "US State",
         "multi": true,
         "name": "us_state",
         "options": [],
-        "query": {
-          "query": "label_values(transactions_total, us_state)",
-          "refId": "StandardVariableQuery"
-        },
+        "query": "SELECT DISTINCT us_state FROM scores WHERE us_state IS NOT NULL ORDER BY us_state;",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -141,27 +191,29 @@
         "type": "query"
       },
       {
-        "current": {},
-        "datasource": {
-          "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
-        },
-        "definition": "label_values(transactions_total, merch)",
-        "hide": 0,
-        "includeAll": true,
-        "multi": true,
-        "name": "merch",
-        "options": [],
-        "query": {
-          "query": "label_values(transactions_total, merch)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
-        "type": "query"
-      }
+      "current": {
+        "selected": true,
+        "text": "All",
+        "value": "%"
+      },
+      "datasource": {
+        "type": "postgres",
+        "name": "PostgreSQL"
+      },
+      "definition": "SELECT DISTINCT merch FROM scores WHERE merch IS NOT NULL ORDER BY merch;",
+      "hide": 0,
+      "includeAll": true,
+      "label": "Merchant",
+      "multi": true,
+      "name": "merch",
+      "options": [],
+      "query": "SELECT DISTINCT merch FROM scores WHERE merch IS NOT NULL ORDER BY merch;",
+      "refresh": 1,
+      "regex": "",
+      "skipUrlSync": false,
+      "sort": 1,
+      "type": "query"
+    }
     ]
   },
   "time": {

@@ -12,10 +12,10 @@ logger = logging.getLogger(__name__)
 
 # Определяем метрики
 DB_WRITE_TIME = Summary('scoring_db_write_seconds', 'Время записи скоринга в БД')
-SCORING_COUNT = Counter('scorings_total', 'Общее количество записанных скорингов', ["us_state", "merch"])
-FRAUD_SCORE_HISTOGRAM = Histogram('scoring_fraud_score', 'Распределение записанных скоров мошенничества',  ["us_state", "merch"],
+SCORING_COUNT = Counter('scorings_total', 'Общее количество записанных скорингов')
+FRAUD_SCORE_HISTOGRAM = Histogram('scoring_fraud_score', 'Распределение записанных скоров мошенничества', 
                                 buckets=[i/50.0 for i in range(51)])  # [0.0, 0.02, 0.04, ..., 0.98, 1.0]
-FRAUD_COUNT = Counter('fraud_detected_total', 'Количество обнаруженных мошеннических транзакций', ["us_state", "merch"])
+FRAUD_COUNT = Counter('fraud_detected_total', 'Количество обнаруженных мошеннических транзакций')
 
 def get_db_config():
     return {
@@ -35,6 +35,9 @@ def create_table(conn):
                 transaction_id TEXT NOT NULL,
                 score FLOAT NOT NULL,
                 fraud_flag INT NOT NULL,
+                us_state TEXT,
+                merch TEXT,
+                cat_id TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
@@ -46,23 +49,17 @@ def create_table(conn):
 def insert_score(conn, data):
     with conn.cursor() as cur:
         cur.execute("""
-            INSERT INTO scores (transaction_id, score, fraud_flag)
-            VALUES (%s, %s, %s);
-        """, (data["transaction_id"], data["score"], data["fraud_flag"]))
+            INSERT INTO scores (transaction_id, score, fraud_flag, us_state, merch, cat_id)
+            VALUES (%s, %s, %s, %s, %s, %s);
+        """, (data["transaction_id"], data["score"], data["fraud_flag"], data["us_state"], data["merch"], data["cat_id"]))
         conn.commit()
     
     # Обновляем метрики
-    us_state = str(data.get("us_state", "unknown"))
-    merch = str(data.get("merch", "unknown"))
-    score = float(data["score"])
-    fraud_flag = int(data["fraud_flag"])
-
-    SCORING_COUNT.labels(us_state=us_state, merch=merch).inc()
-
-    FRAUD_SCORE_HISTOGRAM.labels(us_state=us_state, merch=merch).observe(score)
-
-    if fraud_flag == 1:
-        FRAUD_COUNT.labels(us_state=us_state, merch=merch).inc()
+    SCORING_COUNT.inc()
+    FRAUD_SCORE_HISTOGRAM.observe(data["score"])
+    
+    if data["fraud_flag"] == 1:
+        FRAUD_COUNT.inc()
 
 
 def run_consumer():
