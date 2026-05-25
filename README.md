@@ -203,17 +203,3 @@ docker-compose up --build
 ```bash
 docker-compose down -v
 ```
-Если нужно очистить данные и метрики:
-```bash
-docker volume rm $(docker volume ls -q | grep -E 'postgres_data|prometheus_data|grafana_data')
-```
-
-
-
-
-
-
-
-
-
-
